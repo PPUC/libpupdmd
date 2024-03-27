@@ -1,0 +1,85 @@
+#pragma once
+
+#define PUPDMD_VERSION_MAJOR 0  // X Digits
+#define PUPDMD_VERSION_MINOR 1  // Max 2 Digits
+#define PUPDMD_VERSION_PATCH 0  // Max 2 Digits
+
+#define _PUPDMD_STR(x) #x
+#define PUPDMD_STR(x) _PUPDMD_STR(x)
+
+#define PUPDMD_VERSION \
+  PUPDMD_STR(PUPDMD_VERSION_MAJOR) "." PUPDMD_STR(PUPDMD_VERSION_MINOR) "." PUPDMD_STR(PUPDMD_VERSION_PATCH)
+#define PUPDMD_MINOR_VERSION PUPDMD_STR(PUPDMD_VERSION_MAJOR) "." PUPDMD_STR(PUPDMD_VERSION_MINOR)
+
+#ifdef _MSC_VER
+#define PUPDMDAPI __declspec(dllexport)
+#define PUPDMDCALLBACK __stdcall
+#else
+#define PUPDMDAPI __attribute__((visibility("default")))
+#define PUPDMDCALLBACK
+#endif
+
+#define PUPDMD_MAX_NAME_SIZE 16
+#define PUPDMD_MAX_PATH_SIZE 256
+
+#define PUPDMD_MASK_R 253
+#define PUPDMD_MASK_G 0
+#define PUPDMD_MASK_B 253
+
+#include <cstdint>
+#include <map>
+
+namespace PUPDMD
+{
+
+// BMP header structure
+#pragma pack(push, 1)
+struct BMPHeader
+{
+  char signature[2];         // Signature, should be 'BM'
+  uint32_t fileSize;         // Size of the BMP file
+  uint16_t reserved1;        // Reserved field 1
+  uint16_t reserved2;        // Reserved field 2
+  uint32_t dataOffset;       // Pixel data offset
+  uint32_t headerSize;       // Size of the header
+  int32_t width;             // Width of the image
+  int32_t height;            // Height of the image
+  uint16_t planes;           // Number of color planes, must be 1
+  uint16_t bpp;              // Bits per pixel
+  uint32_t compression;      // Compression method
+  uint32_t imageSize;        // Size of the raw pixel data
+  int32_t xPixelsPerMeter;   // Horizontal resolution
+  int32_t yPixelsPerMeter;   // Vertical resolution
+  uint32_t colorsUsed;       // Number of colors in the palette
+  uint32_t colorsImportant;  // Number of important colors
+};
+#pragma pack(pop)
+
+struct Hash
+{
+  bool mask = true;
+  uint64_t hash;
+  uint8_t x = 255;
+  uint8_t y;
+  uint8_t width = 0;
+  uint8_t height = 0;
+};
+
+class PUPDMDAPI DMD
+{
+ public:
+  DMD();
+  ~DMD();
+
+  bool Load(const char* const puppath, const char* const romname);
+  uint16_t Match(uint8_t* frame, uint16_t width, uint16_t height);
+  std::map<uint16_t, Hash> GetExactColorMap() { return m_ExactColorMap; }
+
+ private:
+  void CalculateHash(uint8_t* frame, Hash* hash);
+
+  std::map<uint16_t, Hash> m_ExactColorMap;
+  // std::map<uint16_t, Hash> m_BooleanMap;
+};
+
+}  // namespace PUPDMD
