@@ -58,7 +58,8 @@ struct BMPHeader
 struct Hash
 {
   bool mask = true;
-  uint64_t hash = 0;
+  uint64_t exactColorHash = 0;
+  uint64_t booleanHash = 0;
   uint8_t x = 255;
   uint8_t y = 255;
   uint8_t width = 0;
@@ -72,14 +73,13 @@ class PUPDMDAPI DMD
   ~DMD();
 
   bool Load(const char* const puppath, const char* const romname);
-  uint16_t Match(uint8_t* frame, uint16_t width, uint16_t height);
-  std::map<uint16_t, Hash> GetExactColorMap() { return m_ExactColorMap; }
+  uint16_t Match(uint8_t* frame, bool exactColor = true);
+  std::map<uint16_t, Hash> GetHashMap() { return m_HashMap; }
 
  private:
-  void CalculateHash(uint8_t* frame, Hash* hash);
+  void CalculateHash(uint8_t* frame, Hash* hash, bool exactColor);
 
-  std::map<uint16_t, Hash> m_ExactColorMap;
-  // std::map<uint16_t, Hash> m_BooleanMap;
+  std::map<uint16_t, Hash> m_HashMap;
 };
 
 }  // namespace PUPDMD
