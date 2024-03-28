@@ -93,7 +93,7 @@ bool DMD::Load(const char* const puppath, const char* const romname)
             {
               // Found left top corner
               hash.x = x;
-              hash.x = y;
+              hash.y = y;
             }
             else if (hash.x < 128)
             {

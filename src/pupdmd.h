@@ -58,9 +58,9 @@ struct BMPHeader
 struct Hash
 {
   bool mask = true;
-  uint64_t hash;
+  uint64_t hash = 0;
   uint8_t x = 255;
-  uint8_t y;
+  uint8_t y = 255;
   uint8_t width = 0;
   uint8_t height = 0;
 };
