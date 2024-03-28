@@ -101,7 +101,6 @@ jobs:
           commands: |
             apt-get update -y --allow-releaseinfo-change
             apt-get install --no-install-recommends -y pkg-config cmake autoconf automake libtool
-            ./platforms/${{ matrix.platform }}/${{ matrix.arch }}/external.sh
             NUM_PROCS=$(nproc)
             cmake -DCMAKE_BUILD_TYPE=Release -DPLATFORM=${{ matrix.platform }} -DARCH=${{ matrix.arch }} -B build
             cmake --build build -- -j${NUM_PROCS}
