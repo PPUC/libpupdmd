@@ -179,7 +179,7 @@ jobs:
                 "libpupdmd-${{ needs.version.outputs.tag }}-macos-x64/$filename"
             fi
           done
-          for filename in dmdserver dmdserver_test pupdmd_test_s pupdmd_test; do
+          for filename in pupdmd_test_s pupdmd_test; do
             lipo -create -output "tmp/$filename" \
                "libpupdmd-${{ needs.version.outputs.tag }}-macos-arm64/$filename" \
                "libpupdmd-${{ needs.version.outputs.tag }}-macos-x64/$filename"
