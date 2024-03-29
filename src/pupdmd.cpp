@@ -42,7 +42,13 @@ bool DMD::Load(const char* const puppath, const char* const romname)
   char folderPath[PUPDMD_MAX_PATH_SIZE + PUPDMD_MAX_NAME_SIZE + 12];
   snprintf(folderPath, PUPDMD_MAX_PATH_SIZE + PUPDMD_MAX_NAME_SIZE + 11, "%s/%s/PupCapture", puppath, romname);
 
-  if (!fs::is_directory(folderPath)) return false;
+  if (!fs::is_directory(folderPath))
+  {
+    Log("Directory does not exist: %s", folderPath);
+    return false;
+  }
+
+  Log("Scanning directory: %s", folderPath);
 
   // Regular expression to extract numeric part from file name (case insensitive)
   std::regex pattern(R"((\d+)\.bmp)", std::regex_constants::icase);
