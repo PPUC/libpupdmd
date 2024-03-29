@@ -78,14 +78,14 @@ class PUPDMDAPI DMD
 
   void SetLogCallback(PUPDMD_LogCallback callback, const void* userData);
   bool Load(const char* const puppath, const char* const romname);
-  uint16_t Match(uint8_t* frame, bool exactColor = true);
-  uint16_t MatchIndexed(uint8_t* frame);
+  uint16_t Match(uint8_t* pFrame, bool exactColor = true);
+  uint16_t MatchIndexed(uint8_t* pFrame);
   std::map<uint16_t, Hash> GetHashMap() { return m_HashMap; }
 
  private:
   void Log(const char* format, ...);
-  void CalculateHash(uint8_t* frame, Hash* hash, bool exactColor);
-  void CalculateHashIndexed(uint8_t* frame, Hash* hash);
+  void CalculateHash(uint8_t* pFrame, Hash* pHash, bool exactColor);
+  void CalculateHashIndexed(uint8_t* pFrame, Hash* pHash);
 
   std::map<uint16_t, Hash> m_HashMap;
 

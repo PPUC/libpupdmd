@@ -161,27 +161,27 @@ bool DMD::Load(const char* const puppath, const char* const romname)
   return true;
 }
 
-void DMD::CalculateHash(uint8_t* frame, Hash* hash, bool exactColor)
+void DMD::CalculateHash(uint8_t* pFrame, Hash* pHash, bool exactColor)
 {
   if (exactColor)
   {
-    if (hash->mask)
+    if (pHash->mask)
     {
-      hash->exactColorHash = komihash(frame, 128 * 32 * 3, 0);
+      uint16_t width = (uint16_t)pHash->width * 3;
+      uint16_t length = width * pHash->height;
+      uint8_t* pBuffer = (uint8_t*)malloc(length);
+      uint16_t idx = 0;
+      for (uint8_t y = pHash->y; y < (pHash->y + pHash->height); y++)
+      {
+        memcpy(&pBuffer[idx], &pFrame[((y * 128) + pHash->x) * 3], width);
+        idx += width;
+      }
+      pHash->exactColorHash = komihash(pBuffer, length, 0);
+      free(pBuffer);
     }
     else
     {
-      uint16_t width = (uint16_t)hash->width * 3;
-      uint16_t length = width * hash->height;
-      uint8_t* buffer = (uint8_t*)malloc(length);
-      uint16_t idx = 0;
-      for (uint8_t y = hash->y; y < (hash->y + hash->height); y++)
-      {
-        memcpy(&buffer[idx], &frame[((y * 128) + hash->x) * 3], width);
-        idx += width;
-      }
-      hash->exactColorHash = komihash(buffer, length, 0);
-      free(buffer);
+      pHash->exactColorHash = komihash(pFrame, 128 * 32 * 3, 0);
     }
   }
   else
@@ -189,73 +189,86 @@ void DMD::CalculateHash(uint8_t* frame, Hash* hash, bool exactColor)
     uint8_t booleanFrame[128 * 32];
     for (uint16_t i = 0; i < 128 * 32; i++)
     {
-      booleanFrame[i] = !(frame[i * 3] == 0 && frame[(i * 3) + 1] == 0 && frame[(i * 3) + 2] == 0);
+      booleanFrame[i] = !(pFrame[i * 3] == 0 && pFrame[(i * 3) + 1] == 0 && pFrame[(i * 3) + 2] == 0);
     }
 
-    if (hash->mask)
+    if (pHash->mask)
     {
-      hash->booleanHash = komihash(booleanFrame, 128 * 32, 0);
+      uint16_t length = pHash->width * pHash->height;
+      uint8_t* pBuffer = (uint8_t*)malloc(length);
+      uint16_t idx = 0;
+      for (uint8_t y = pHash->y; y < (pHash->y + pHash->height); y++)
+      {
+        memcpy(&pBuffer[idx], &booleanFrame[(y * 128) + pHash->x], pHash->width);
+        idx += pHash->width;
+      }
+      pHash->booleanHash = komihash(pBuffer, length, 0);
+      free(pBuffer);
     }
     else
     {
-      uint16_t length = hash->width * hash->height;
-      uint8_t* buffer = (uint8_t*)malloc(length);
-      uint16_t idx = 0;
-      for (uint8_t y = hash->y; y < (hash->y + hash->height); y++)
-      {
-        memcpy(&buffer[idx], &booleanFrame[(y * 128) + hash->x], hash->width);
-        idx += hash->width;
-      }
-      hash->booleanHash = komihash(buffer, length, 0);
-      free(buffer);
+      pHash->booleanHash = komihash(booleanFrame, 128 * 32, 0);
     }
   }
 }
 
-void DMD::CalculateHashIndexed(uint8_t* frame, Hash* hash)
+void DMD::CalculateHashIndexed(uint8_t* pFrame, Hash* pHash)
 {
-  if (hash->mask)
+  if (pHash->mask)
   {
-    uint8_t booleanFrame[128 * 32];
-    for (uint16_t i = 0; i < 128 * 32; i++)
-    {
-      booleanFrame[i] = (frame[i] > 0);
-    }
-    hash->booleanHash = komihash(booleanFrame, 128 * 32, 0);
-  }
-  else
-  {
-    uint16_t length = hash->width * hash->height;
+    uint16_t length = pHash->width * pHash->height;
     uint8_t* buffer = (uint8_t*)malloc(length);
     uint16_t idx = 0;
 
-    for (uint8_t y = hash->y; y < (hash->y + hash->height); y++)
+    for (uint8_t y = pHash->y; y < (pHash->y + pHash->height); y++)
     {
-      for (uint8_t x = hash->x; x < (hash->x + hash->width); x++)
+      for (uint8_t x = pHash->x; x < (pHash->x + pHash->width); x++)
       {
-        buffer[idx++] = (frame[(y * 128) + x] > 0);
+        buffer[idx++] = (pFrame[(y * 128) + x] > 0);
       }
     }
-    hash->booleanHash = komihash(buffer, length, 0);
+    pHash->booleanHash = komihash(buffer, length, 0);
     free(buffer);
+  }
+  else
+  {
+    uint8_t booleanFrame[128 * 32];
+    for (uint16_t i = 0; i < 128 * 32; i++)
+    {
+      booleanFrame[i] = (pFrame[i] > 0);
+    }
+    pHash->booleanHash = komihash(booleanFrame, 128 * 32, 0);
   }
 }
 
-uint16_t DMD::Match(uint8_t* frame, bool exactColor)
+uint16_t DMD::Match(uint8_t* pFrame, bool exactColor)
 {
+  uint64_t fullHash = 0;
+
   for (const auto& pair : m_HashMap)
   {
     Hash hash;
     hash.mask = pair.second.mask;
-    if (!hash.mask)
+    if (hash.mask)
     {
       hash.x = pair.second.x;
       hash.y = pair.second.y;
       hash.width = pair.second.width;
       hash.height = pair.second.height;
+      CalculateHash(pFrame, &hash, exactColor);
     }
-
-    CalculateHash(frame, &hash, exactColor);
+    else
+    {
+      if (fullHash)
+      {
+        hash.exactColorHash = hash.booleanHash = fullHash;
+      }
+      else
+      {
+        CalculateHash(pFrame, &hash, exactColor);
+        fullHash = exactColor ? hash.exactColorHash : hash.booleanHash;
+      }
+    }
 
     if ((exactColor && hash.exactColorHash == pair.second.exactColorHash) ||
         (!exactColor && hash.booleanHash == pair.second.booleanHash))
@@ -268,21 +281,34 @@ uint16_t DMD::Match(uint8_t* frame, bool exactColor)
   return 0;
 }
 
-uint16_t DMD::MatchIndexed(uint8_t* frame)
+uint16_t DMD::MatchIndexed(uint8_t* pFrame)
 {
+  uint64_t fullHash = 0;
+
   for (const auto& pair : m_HashMap)
   {
     Hash hash;
     hash.mask = pair.second.mask;
-    if (!hash.mask)
+    if (hash.mask)
     {
       hash.x = pair.second.x;
       hash.y = pair.second.y;
       hash.width = pair.second.width;
       hash.height = pair.second.height;
+      CalculateHashIndexed(pFrame, &hash);
     }
-
-    CalculateHashIndexed(frame, &hash);
+    else
+    {
+      if (fullHash)
+      {
+        hash.booleanHash = fullHash;
+      }
+      else
+      {
+        CalculateHashIndexed(pFrame, &hash);
+        fullHash = hash.booleanHash;
+      }
+    }
 
     if (hash.booleanHash == pair.second.booleanHash)
     {
