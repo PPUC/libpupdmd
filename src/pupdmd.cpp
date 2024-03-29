@@ -70,7 +70,7 @@ bool DMD::Load(const char* const puppath, const char* const romname)
 
     if (!file.is_open())
     {
-      Log("Error opening file: %s", filePath);
+      Log("Error opening file: %s", filePath.c_str());
       continue;
     }
 
@@ -81,13 +81,13 @@ bool DMD::Load(const char* const puppath, const char* const romname)
     // Check if file is a BMP file
     if (header.signature[0] != 'B' || header.signature[1] != 'M')
     {
-      Log("Not a BMP file: %s", filePath);
+      Log("Not a BMP file: %s", filePath.c_str());
       continue;
     }
 
     if (header.compression != 0)
     {
-      Log("Compression is not supported: %s", filePath);
+      Log("Compression is not supported: %s", filePath.c_str());
       continue;
     }
 
