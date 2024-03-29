@@ -1,8 +1,8 @@
 #pragma once
 
 #define PUPDMD_VERSION_MAJOR 0  // X Digits
-#define PUPDMD_VERSION_MINOR 1  // Max 2 Digits
-#define PUPDMD_VERSION_PATCH 1  // Max 2 Digits
+#define PUPDMD_VERSION_MINOR 2  // Max 2 Digits
+#define PUPDMD_VERSION_PATCH 0  // Max 2 Digits
 
 #define _PUPDMD_STR(x) #x
 #define PUPDMD_STR(x) _PUPDMD_STR(x)
@@ -26,8 +26,12 @@
 #define PUPDMD_MASK_G 0
 #define PUPDMD_MASK_B 253
 
-#include <cstdint>
+#include <inttypes.h>
+#include <stdarg.h>
+
 #include <map>
+
+typedef void(PUPDMDCALLBACK* PUPDMD_LogCallback)(const char* format, va_list args, const void* userData);
 
 namespace PUPDMD
 {
@@ -72,16 +76,21 @@ class PUPDMDAPI DMD
   DMD();
   ~DMD();
 
+  void SetLogCallback(PUPDMD_LogCallback callback, const void* userData);
   bool Load(const char* const puppath, const char* const romname);
   uint16_t Match(uint8_t* frame, bool exactColor = true);
   uint16_t MatchIndexed(uint8_t* frame);
   std::map<uint16_t, Hash> GetHashMap() { return m_HashMap; }
 
  private:
+  void Log(const char* format, ...);
   void CalculateHash(uint8_t* frame, Hash* hash, bool exactColor);
   void CalculateHashIndexed(uint8_t* frame, Hash* hash);
 
   std::map<uint16_t, Hash> m_HashMap;
+
+  PUPDMD_LogCallback m_logCallback = nullptr;
+  const void* m_logUserData = nullptr;
 };
 
 }  // namespace PUPDMD

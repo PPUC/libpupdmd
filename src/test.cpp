@@ -4,9 +4,18 @@
 
 #include "pupdmd.h"
 
+void PUPDMDCALLBACK LogCallback(const char* format, va_list args,
+                               const void* pUserData) {
+  char buffer[1024];
+  vsnprintf(buffer, sizeof(buffer), format, args);
+
+  printf("%s\n", buffer);
+}
+
 int main(int argc, const char* argv[])
 {
   PUPDMD::DMD* pDmd = new PUPDMD::DMD();
+  pDmd->SetLogCallback(LogCallback, nullptr);
   pDmd->Load(".", "test");
   for (const auto& pair : pDmd->GetHashMap())
   {

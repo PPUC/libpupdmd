@@ -18,6 +18,25 @@ DMD::DMD() {}
 
 DMD::~DMD() {}
 
+void DMD::SetLogCallback(PUPDMD_LogCallback callback, const void* userData)
+{
+  m_logCallback = callback;
+  m_logUserData = userData;
+}
+
+void DMD::Log(const char* format, ...)
+{
+  if (!m_logCallback)
+  {
+    return;
+  }
+
+  va_list args;
+  va_start(args, format);
+  (*(m_logCallback))(format, args, m_logUserData);
+  va_end(args);
+}
+
 bool DMD::Load(const char* const puppath, const char* const romname)
 {
   char folderPath[PUPDMD_MAX_PATH_SIZE + PUPDMD_MAX_NAME_SIZE + 12];
@@ -45,8 +64,7 @@ bool DMD::Load(const char* const puppath, const char* const romname)
 
     if (!file.is_open())
     {
-      // @todo use log callback
-      std::cerr << "Error opening file: " << filePath << std::endl;
+      Log("Error opening file: %s", filePath);
       continue;
     }
 
@@ -57,15 +75,13 @@ bool DMD::Load(const char* const puppath, const char* const romname)
     // Check if file is a BMP file
     if (header.signature[0] != 'B' || header.signature[1] != 'M')
     {
-      // @todo use log callback
-      std::cerr << "Not a BMP file: " << filePath << std::endl;
+      Log("Not a BMP file: %s", filePath);
       continue;
     }
 
     if (header.compression != 0)
     {
-      // @todo use log callback
-      std::cerr << "Compression is not supported: " << filePath << std::endl;
+      Log("Compression is not supported: %s", filePath);
       continue;
     }
 
@@ -128,6 +144,9 @@ bool DMD::Load(const char* const puppath, const char* const romname)
       CalculateHash((uint8_t*)pixelData.data(), &hash, false);
 
       m_HashMap[triggerID] = hash;
+      Log("Added PUP DMD trigger ID: %03d, mask: %d, x: %03d, y: %03d, width: %03d, height: %03d, exactColorHash: "
+          "%020" PRIu64 ", booleanHash: %020" PRIu64,
+          triggerID, hash.mask, hash.x, hash.y, hash.width, hash.height, hash.exactColorHash, hash.booleanHash);
     }
 
     file.close();
@@ -234,7 +253,10 @@ uint16_t DMD::Match(uint8_t* frame, bool exactColor)
 
     if ((exactColor && hash.exactColorHash == pair.second.exactColorHash) ||
         (!exactColor && hash.booleanHash == pair.second.booleanHash))
+    {
+      Log("Matched PUP DMD trigger ID: %d", pair.first);
       return pair.first;
+    }
   }
 
   return 0;
@@ -256,7 +278,11 @@ uint16_t DMD::MatchIndexed(uint8_t* frame)
 
     CalculateHashIndexed(frame, &hash);
 
-    if (hash.booleanHash == pair.second.booleanHash) return pair.first;
+    if (hash.booleanHash == pair.second.booleanHash)
+    {
+      Log("Matched PUP DMD trigger ID: %d", pair.first);
+      return pair.first;
+    }
   }
 
   return 0;
