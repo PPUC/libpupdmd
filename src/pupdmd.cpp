@@ -187,6 +187,35 @@ void DMD::CalculateHash(uint8_t* frame, Hash* hash, bool exactColor)
   }
 }
 
+void DMD::CalculateHashIndexed(uint8_t* frame, Hash* hash)
+{
+  if (hash->mask)
+  {
+    uint8_t booleanFrame[128 * 32];
+    for (uint16_t i = 0; i < 128 * 32; i++)
+    {
+      booleanFrame[i] = (frame[i] > 0);
+    }
+    hash->booleanHash = komihash(booleanFrame, 128 * 32, 0);
+  }
+  else
+  {
+    uint16_t length = hash->width * hash->height;
+    uint8_t* buffer = (uint8_t*)malloc(length);
+    uint16_t idx = 0;
+
+    for (uint8_t y = hash->y; y < (hash->y + hash->height); y++)
+    {
+      for (uint8_t x = hash->x; x < (hash->x + hash->width); x++)
+      {
+        buffer[idx++] = (frame[(y * 128) + x] > 0);
+      }
+    }
+    hash->booleanHash = komihash(buffer, length, 0);
+    free(buffer);
+  }
+}
+
 uint16_t DMD::Match(uint8_t* frame, bool exactColor)
 {
   for (const auto& pair : m_HashMap)
@@ -206,6 +235,28 @@ uint16_t DMD::Match(uint8_t* frame, bool exactColor)
     if ((exactColor && hash.exactColorHash == pair.second.exactColorHash) ||
         (!exactColor && hash.booleanHash == pair.second.booleanHash))
       return pair.first;
+  }
+
+  return 0;
+}
+
+uint16_t DMD::MatchIndexed(uint8_t* frame)
+{
+  for (const auto& pair : m_HashMap)
+  {
+    Hash hash;
+    hash.mask = pair.second.mask;
+    if (!hash.mask)
+    {
+      hash.x = pair.second.x;
+      hash.y = pair.second.y;
+      hash.width = pair.second.width;
+      hash.height = pair.second.height;
+    }
+
+    CalculateHashIndexed(frame, &hash);
+
+    if (hash.booleanHash == pair.second.booleanHash) return pair.first;
   }
 
   return 0;

@@ -2,7 +2,7 @@
 
 #define PUPDMD_VERSION_MAJOR 0  // X Digits
 #define PUPDMD_VERSION_MINOR 1  // Max 2 Digits
-#define PUPDMD_VERSION_PATCH 0  // Max 2 Digits
+#define PUPDMD_VERSION_PATCH 1  // Max 2 Digits
 
 #define _PUPDMD_STR(x) #x
 #define PUPDMD_STR(x) _PUPDMD_STR(x)
@@ -74,10 +74,12 @@ class PUPDMDAPI DMD
 
   bool Load(const char* const puppath, const char* const romname);
   uint16_t Match(uint8_t* frame, bool exactColor = true);
+  uint16_t MatchIndexed(uint8_t* frame);
   std::map<uint16_t, Hash> GetHashMap() { return m_HashMap; }
 
  private:
   void CalculateHash(uint8_t* frame, Hash* hash, bool exactColor);
+  void CalculateHashIndexed(uint8_t* frame, Hash* hash);
 
   std::map<uint16_t, Hash> m_HashMap;
 };
