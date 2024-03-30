@@ -37,7 +37,7 @@ void DMD::Log(const char* format, ...)
   va_end(args);
 }
 
-bool DMD::Load(const char* const puppath, const char* const romname)
+bool DMD::Load(const char* const puppath, const char* const romname, uint8_t bitDepth)
 {
   char folderPath[PUPDMD_MAX_PATH_SIZE + PUPDMD_MAX_NAME_SIZE + 12];
   snprintf(folderPath, PUPDMD_MAX_PATH_SIZE + PUPDMD_MAX_NAME_SIZE + 11, "%s/%s/PupCapture", puppath, romname);
@@ -100,17 +100,80 @@ bool DMD::Load(const char* const puppath, const char* const romname)
     if (pixelDataSize == 128 * 32 * 3)
     {
       PUPDMD::Hash hash;
-      std::vector<char> pixelData(pixelDataSize);
+      std::vector<uint8_t> pixelData(pixelDataSize);
+      std::vector<uint8_t> rgb(0);
+      std::vector<uint8_t> indexed(0);
 
-      file.read(pixelData.data(), pixelDataSize);
+      file.read(reinterpret_cast<char*>(pixelData.data()), pixelDataSize);
 
       for (uint8_t y = 0; y < 32; y++)
       {
         for (uint8_t x = 0; x < 128; x++)
         {
-          uint8_t r = pixelData.at((y * 128 + x) * 3);
+          // Usually the order is BGR in BMP
+          uint8_t b = pixelData.at((y * 128 + x) * 3);
           uint8_t g = pixelData.at((y * 128 + x) * 3 + 1);
-          uint8_t b = pixelData.at((y * 128 + x) * 3 + 2);
+          uint8_t r = pixelData.at((y * 128 + x) * 3 + 2);
+          rgb.push_back(r);
+          rgb.push_back(g);
+          rgb.push_back(b);
+
+          // Since PupCapture DMDs are orange it is sufficient to look at red
+          switch (bitDepth)
+          {
+            case 2:
+              if (r == PUPDMD_MASK_R)
+                indexed.push_back(0);
+              else if (r < 8)
+                indexed.push_back(0);
+              else if (r < 48)
+                indexed.push_back(1);
+              else if (r < 128)
+                indexed.push_back(2);
+              else
+                indexed.push_back(3);
+              break;
+            case 4:
+              if (r == PUPDMD_MASK_R)
+                indexed.push_back(0);
+              else if (r < 8)
+                indexed.push_back(0);
+              else if (r < 24)
+                indexed.push_back(1);
+              else if (r < 48)
+                indexed.push_back(2);
+              else if (r < 56)
+                indexed.push_back(3);
+              else if (r < 72)
+                indexed.push_back(4);
+              else if (r < 96)
+                indexed.push_back(5);
+              else if (r < 112)
+                indexed.push_back(6);
+              else if (r < 128)
+                indexed.push_back(7);
+              else if (r < 144)
+                indexed.push_back(8);
+              else if (r < 160)
+                indexed.push_back(9);
+              else if (r < 176)
+                indexed.push_back(10);
+              else if (r < 192)
+                indexed.push_back(11);
+              else if (r < 208)
+                indexed.push_back(12);
+              else if (r < 224)
+                indexed.push_back(13);
+              else if (r < 240)
+                indexed.push_back(14);
+              else
+                indexed.push_back(15);
+              break;
+          }
+
+          // if (r > 0)
+          //   Log("Found illuminated pixel RGB %03d %03d %03d, converted to index %02d", r, g, b, indexed.back());
+
           if (PUPDMD_MASK_R == r && PUPDMD_MASK_G == g && PUPDMD_MASK_B == b)
           {
             if (hash.x == 255)
@@ -132,6 +195,7 @@ bool DMD::Load(const char* const puppath, const char* const romname)
 
       if (hash.x < 128)
       {
+        hash.mask = true;
         hash.x++;
         hash.y++;
         hash.width--;
@@ -146,13 +210,15 @@ bool DMD::Load(const char* const puppath, const char* const romname)
         hash.height = 32;
       }
 
-      CalculateHash((uint8_t*)pixelData.data(), &hash, true);
-      CalculateHash((uint8_t*)pixelData.data(), &hash, false);
+      CalculateHash(rgb.data(), &hash, true);
+      CalculateHash(rgb.data(), &hash, false);
+      CalculateHashIndexed(rgb.data(), &hash);
 
       m_HashMap[triggerID] = hash;
       Log("Added PUP DMD trigger ID: %03d, mask: %d, x: %03d, y: %03d, width: %03d, height: %03d, exactColorHash: "
-          "%020" PRIu64 ", booleanHash: %020" PRIu64,
-          triggerID, hash.mask, hash.x, hash.y, hash.width, hash.height, hash.exactColorHash, hash.booleanHash);
+          "%020" PRIu64 ", booleanHash: %020" PRIu64 ", indexedHash: %020" PRIu64,
+          triggerID, hash.mask, hash.x, hash.y, hash.width, hash.height, hash.exactColorHash, hash.booleanHash,
+          hash.indexedHash);
     }
 
     file.close();
@@ -161,7 +227,7 @@ bool DMD::Load(const char* const puppath, const char* const romname)
   return true;
 }
 
-void DMD::CalculateHash(uint8_t* pFrame, Hash* pHash, bool exactColor)
+void DMD::CalculateHash(const uint8_t* pFrame, Hash* pHash, bool exactColor)
 {
   if (exactColor)
   {
@@ -212,7 +278,7 @@ void DMD::CalculateHash(uint8_t* pFrame, Hash* pHash, bool exactColor)
   }
 }
 
-void DMD::CalculateHashIndexed(uint8_t* pFrame, Hash* pHash)
+void DMD::CalculateHashIndexed(const uint8_t* pFrame, Hash* pHash)
 {
   if (pHash->mask)
   {
@@ -224,24 +290,19 @@ void DMD::CalculateHashIndexed(uint8_t* pFrame, Hash* pHash)
     {
       for (uint8_t x = pHash->x; x < (pHash->x + pHash->width); x++)
       {
-        buffer[idx++] = (pFrame[(y * 128) + x] > 0);
+        buffer[idx++] = pFrame[(y * 128) + x];
       }
     }
-    pHash->booleanHash = komihash(buffer, length, 0);
+    pHash->indexedHash = komihash(buffer, length, 0);
     free(buffer);
   }
   else
   {
-    uint8_t booleanFrame[128 * 32];
-    for (uint16_t i = 0; i < 128 * 32; i++)
-    {
-      booleanFrame[i] = (pFrame[i] > 0);
-    }
-    pHash->booleanHash = komihash(booleanFrame, 128 * 32, 0);
+    pHash->indexedHash = komihash(pFrame, 128 * 32, 0);
   }
 }
 
-uint16_t DMD::Match(uint8_t* pFrame, bool exactColor)
+uint16_t DMD::Match(const uint8_t* pFrame, bool exactColor)
 {
   uint64_t fullHash = 0;
 
@@ -281,7 +342,7 @@ uint16_t DMD::Match(uint8_t* pFrame, bool exactColor)
   return 0;
 }
 
-uint16_t DMD::MatchIndexed(uint8_t* pFrame)
+uint16_t DMD::MatchIndexed(const uint8_t* pFrame)
 {
   uint64_t fullHash = 0;
 
@@ -301,16 +362,16 @@ uint16_t DMD::MatchIndexed(uint8_t* pFrame)
     {
       if (fullHash)
       {
-        hash.booleanHash = fullHash;
+        hash.indexedHash = fullHash;
       }
       else
       {
         CalculateHashIndexed(pFrame, &hash);
-        fullHash = hash.booleanHash;
+        fullHash = hash.indexedHash;
       }
     }
 
-    if (hash.booleanHash == pair.second.booleanHash)
+    if (hash.indexedHash == pair.second.indexedHash)
     {
       Log("Matched PUP DMD trigger ID: %d", pair.first);
       return pair.first;

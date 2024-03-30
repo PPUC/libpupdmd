@@ -1,7 +1,7 @@
 #pragma once
 
 #define PUPDMD_VERSION_MAJOR 0  // X Digits
-#define PUPDMD_VERSION_MINOR 2  // Max 2 Digits
+#define PUPDMD_VERSION_MINOR 3  // Max 2 Digits
 #define PUPDMD_VERSION_PATCH 0  // Max 2 Digits
 
 #define _PUPDMD_STR(x) #x
@@ -64,6 +64,7 @@ struct Hash
   bool mask = true;
   uint64_t exactColorHash = 0;
   uint64_t booleanHash = 0;
+  uint64_t indexedHash = 0;
   uint8_t x = 255;
   uint8_t y = 255;
   uint8_t width = 0;
@@ -77,15 +78,15 @@ class PUPDMDAPI DMD
   ~DMD();
 
   void SetLogCallback(PUPDMD_LogCallback callback, const void* userData);
-  bool Load(const char* const puppath, const char* const romname);
-  uint16_t Match(uint8_t* pFrame, bool exactColor = true);
-  uint16_t MatchIndexed(uint8_t* pFrame);
-  std::map<uint16_t, Hash> GetHashMap() { return m_HashMap; }
+  bool Load(const char* const puppath, const char* const romname, uint8_t bitDepth = 2);
+  uint16_t Match(const uint8_t* pFrame, bool exactColor = true);
+  uint16_t MatchIndexed(const uint8_t* pFrame);
+  const std::map<uint16_t, Hash> GetHashMap() { return m_HashMap; }
 
  private:
   void Log(const char* format, ...);
-  void CalculateHash(uint8_t* pFrame, Hash* pHash, bool exactColor);
-  void CalculateHashIndexed(uint8_t* pFrame, Hash* pHash);
+  void CalculateHash(const uint8_t* pFrame, Hash* pHash, bool exactColor);
+  void CalculateHashIndexed(const uint8_t* pFrame, Hash* pHash);
 
   std::map<uint16_t, Hash> m_HashMap;
 
