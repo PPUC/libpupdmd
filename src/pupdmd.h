@@ -89,6 +89,7 @@ class PUPDMDAPI DMD
   void CalculateHashIndexed(const uint8_t* pFrame, Hash* pHash);
 
   std::map<uint16_t, Hash> m_HashMap;
+  uint16_t m_lastTriggerID = 0;
 
   PUPDMD_LogCallback m_logCallback = nullptr;
   const void* m_logUserData = nullptr;

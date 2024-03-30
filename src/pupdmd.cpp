@@ -40,7 +40,10 @@ void DMD::Log(const char* format, ...)
 bool DMD::Load(const char* const puppath, const char* const romname, uint8_t bitDepth)
 {
   char folderPath[PUPDMD_MAX_PATH_SIZE + PUPDMD_MAX_NAME_SIZE + 12];
-  snprintf(folderPath, PUPDMD_MAX_PATH_SIZE + PUPDMD_MAX_NAME_SIZE + 11, "%s/%s/PupCapture", puppath, romname);
+  std::string puppathObj(puppath);
+  puppathObj.erase(puppathObj.find_last_not_of("/\\") + 1);
+  snprintf(folderPath, PUPDMD_MAX_PATH_SIZE + PUPDMD_MAX_NAME_SIZE + 11, "%s/%s/PupCapture", puppathObj.c_str(),
+           romname);
 
   if (!fs::is_directory(folderPath))
   {
@@ -111,9 +114,10 @@ bool DMD::Load(const char* const puppath, const char* const romname, uint8_t bit
         for (uint8_t x = 0; x < 128; x++)
         {
           // Usually the order is BGR in BMP
-          uint8_t b = pixelData.at((y * 128 + x) * 3);
-          uint8_t g = pixelData.at((y * 128 + x) * 3 + 1);
-          uint8_t r = pixelData.at((y * 128 + x) * 3 + 2);
+          // BMP starts at the lower left, pinball frames at upper left
+          uint8_t b = pixelData.at(((31 - y) * 128 + x) * 3);
+          uint8_t g = pixelData.at(((31 - y) * 128 + x) * 3 + 1);
+          uint8_t r = pixelData.at(((31 - y) * 128 + x) * 3 + 2);
           rgb.push_back(r);
           rgb.push_back(g);
           rgb.push_back(b);
@@ -178,7 +182,7 @@ bool DMD::Load(const char* const puppath, const char* const romname, uint8_t bit
           {
             if (hash.x == 255)
             {
-              // Found left top corner
+              // Found left top corner of a mask
               hash.x = x;
               hash.y = y;
             }
@@ -212,7 +216,7 @@ bool DMD::Load(const char* const puppath, const char* const romname, uint8_t bit
 
       CalculateHash(rgb.data(), &hash, true);
       CalculateHash(rgb.data(), &hash, false);
-      CalculateHashIndexed(rgb.data(), &hash);
+      CalculateHashIndexed(indexed.data(), &hash);
 
       m_HashMap[triggerID] = hash;
       Log("Added PUP DMD trigger ID: %03d, mask: %d, x: %03d, y: %03d, width: %03d, height: %03d, exactColorHash: "
@@ -334,8 +338,14 @@ uint16_t DMD::Match(const uint8_t* pFrame, bool exactColor)
     if ((exactColor && hash.exactColorHash == pair.second.exactColorHash) ||
         (!exactColor && hash.booleanHash == pair.second.booleanHash))
     {
-      Log("Matched PUP DMD trigger ID: %d", pair.first);
-      return pair.first;
+      if (pair.first != m_lastTriggerID)
+      {
+        m_lastTriggerID = pair.first;
+        Log("Matched PUP DMD trigger ID: %d", pair.first);
+        return pair.first;
+      }
+
+      return 0;
     }
   }
 
@@ -373,8 +383,14 @@ uint16_t DMD::MatchIndexed(const uint8_t* pFrame)
 
     if (hash.indexedHash == pair.second.indexedHash)
     {
-      Log("Matched PUP DMD trigger ID: %d", pair.first);
-      return pair.first;
+      if (pair.first != m_lastTriggerID)
+      {
+        m_lastTriggerID = pair.first;
+        Log("Matched PUP DMD trigger ID: %d", pair.first);
+        return pair.first;
+      }
+
+      return 0;
     }
   }
 
