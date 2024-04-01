@@ -106,8 +106,10 @@ bool DMD::Load(const char* const puppath, const char* const romname, uint8_t bit
     {
       PUPDMD::Hash hash;
       std::vector<uint8_t> pixelData(pixelDataSize);
-      std::vector<uint8_t> rgb(0);
-      std::vector<uint8_t> indexed(0);
+      std::vector<uint8_t> rgb;
+      std::vector<uint8_t> indexed;
+      rgb.reserve(pixelDataSize);
+      indexed.reserve(pixelDataSize / 3);
 
       file.read(reinterpret_cast<char*>(pixelData.data()), pixelDataSize);
 
