@@ -100,7 +100,9 @@ bool DMD::Load(const char* const puppath, const char* const romname, uint8_t bit
     // Calculate the size of the pixel data
     size_t pixelDataSize = header.imageSize == 0 ? header.fileSize - header.dataOffset : header.imageSize;
 
-    if (pixelDataSize == 128 * 32 * 3)
+    if (pixelDataSize == header.width * header.height * 3 &&
+        ((header.width == 128 && header.height == 16) || (header.width == 128 && header.height == 32) ||
+         (header.width == 192 && header.height == 64)))
     {
       PUPDMD::Hash hash;
       std::vector<uint8_t> pixelData(pixelDataSize);
@@ -109,15 +111,15 @@ bool DMD::Load(const char* const puppath, const char* const romname, uint8_t bit
 
       file.read(reinterpret_cast<char*>(pixelData.data()), pixelDataSize);
 
-      for (uint8_t y = 0; y < 32; y++)
+      for (uint8_t y = 0; y < header.height; y++)
       {
-        for (uint8_t x = 0; x < 128; x++)
+        for (uint8_t x = 0; x < header.width; x++)
         {
           // Usually the order is BGR in BMP
           // BMP starts at the lower left, pinball frames at upper left
-          uint8_t b = pixelData.at(((31 - y) * 128 + x) * 3);
-          uint8_t g = pixelData.at(((31 - y) * 128 + x) * 3 + 1);
-          uint8_t r = pixelData.at(((31 - y) * 128 + x) * 3 + 2);
+          uint8_t b = pixelData.at(((header.height - 1 - y) * header.width + x) * 3);
+          uint8_t g = pixelData.at(((header.height - 1 - y) * header.width + x) * 3 + 1);
+          uint8_t r = pixelData.at(((header.height - 1 - y) * header.width + x) * 3 + 2);
           rgb.push_back(r);
           rgb.push_back(g);
           rgb.push_back(b);
@@ -180,49 +182,51 @@ bool DMD::Load(const char* const puppath, const char* const romname, uint8_t bit
 
           if (PUPDMD_MASK_R == r && PUPDMD_MASK_G == g && PUPDMD_MASK_B == b)
           {
-            if (hash.x == 255)
+            if (hash.maskX == 255)
             {
               // Found left top corner of a mask
-              hash.x = x;
-              hash.y = y;
+              hash.maskX = x;
+              hash.maskY = y;
             }
-            else if (hash.x < 128)
+            else if (hash.maskX < 192)
             {
-              if (y == hash.y)
-                hash.width++;
-              else if (x == hash.x)
-                hash.height++;
+              if (y == hash.maskY)
+                hash.maskWidth++;
+              else if (x == hash.maskX)
+                hash.maskHeight++;
             }
           }
         }
       }
 
-      if (hash.x < 128)
+      if (hash.maskX < 192)
       {
         hash.mask = true;
-        hash.x++;
-        hash.y++;
-        hash.width--;
-        hash.height--;
+        hash.maskX++;
+        hash.maskY++;
+        hash.maskWidth--;
+        hash.maskHeight--;
       }
       else
       {
         hash.mask = false;
-        hash.x = 0;
-        hash.y = 0;
-        hash.width = 128;
-        hash.height = 32;
+        hash.maskX = 0;
+        hash.maskY = 0;
+        hash.maskWidth = header.width;
+        hash.maskHeight = header.height;
       }
+      hash.width = header.width;
+      hash.height = header.height;
 
       CalculateHash(rgb.data(), &hash, true);
       CalculateHash(rgb.data(), &hash, false);
       CalculateHashIndexed(indexed.data(), &hash);
 
       m_HashMap[triggerID] = hash;
-      Log("Added PUP DMD trigger ID: %03d, mask: %d, x: %03d, y: %03d, width: %03d, height: %03d, exactColorHash: "
-          "%020" PRIu64 ", booleanHash: %020" PRIu64 ", indexedHash: %020" PRIu64,
-          triggerID, hash.mask, hash.x, hash.y, hash.width, hash.height, hash.exactColorHash, hash.booleanHash,
-          hash.indexedHash);
+      Log("Added PUP DMD %dx%d trigger ID: %03d, mask: %d, x: %03d, y: %03d, width: %03d, height: %03d, "
+          "exactColorHash: %020" PRIu64 ", booleanHash: %020" PRIu64 ", indexedHash: %020" PRIu64,
+          hash.width, hash.height, triggerID, hash.mask, hash.maskX, hash.maskY, hash.maskWidth, hash.maskHeight,
+          hash.exactColorHash, hash.booleanHash, hash.indexedHash);
     }
 
     file.close();
@@ -233,17 +237,19 @@ bool DMD::Load(const char* const puppath, const char* const romname, uint8_t bit
 
 void DMD::CalculateHash(const uint8_t* pFrame, Hash* pHash, bool exactColor)
 {
+  uint16_t pixels = pHash->width * pHash->height;
   if (exactColor)
   {
     if (pHash->mask)
     {
-      uint16_t width = (uint16_t)pHash->width * 3;
-      uint16_t length = width * pHash->height;
+      uint16_t width = (uint16_t)pHash->maskWidth * 3;
+      uint8_t height = pHash->maskY + pHash->maskHeight;
+      uint16_t length = width * pHash->maskHeight;
       uint8_t* pBuffer = (uint8_t*)malloc(length);
       uint16_t idx = 0;
-      for (uint8_t y = pHash->y; y < (pHash->y + pHash->height); y++)
+      for (uint8_t y = pHash->maskY; y < height; y++)
       {
-        memcpy(&pBuffer[idx], &pFrame[((y * 128) + pHash->x) * 3], width);
+        memcpy(&pBuffer[idx], &pFrame[((y * pHash->width) + pHash->maskX) * 3], width);
         idx += width;
       }
       pHash->exactColorHash = komihash(pBuffer, length, 0);
@@ -251,34 +257,36 @@ void DMD::CalculateHash(const uint8_t* pFrame, Hash* pHash, bool exactColor)
     }
     else
     {
-      pHash->exactColorHash = komihash(pFrame, 128 * 32 * 3, 0);
+      pHash->exactColorHash = komihash(pFrame, pixels * 3, 0);
     }
   }
   else
   {
-    uint8_t booleanFrame[128 * 32];
-    for (uint16_t i = 0; i < 128 * 32; i++)
+    uint8_t* pBooleanFrame = (uint8_t*)malloc(pixels);
+    for (uint16_t i = 0; i < pixels; i++)
     {
-      booleanFrame[i] = !(pFrame[i * 3] == 0 && pFrame[(i * 3) + 1] == 0 && pFrame[(i * 3) + 2] == 0);
+      pBooleanFrame[i] = !(pFrame[i * 3] == 0 && pFrame[(i * 3) + 1] == 0 && pFrame[(i * 3) + 2] == 0);
     }
 
     if (pHash->mask)
     {
-      uint16_t length = pHash->width * pHash->height;
+      uint8_t height = pHash->maskY + pHash->maskHeight;
+      uint16_t length = pHash->maskWidth * pHash->maskHeight;
       uint8_t* pBuffer = (uint8_t*)malloc(length);
       uint16_t idx = 0;
-      for (uint8_t y = pHash->y; y < (pHash->y + pHash->height); y++)
+      for (uint8_t y = pHash->maskY; y < height; y++)
       {
-        memcpy(&pBuffer[idx], &booleanFrame[(y * 128) + pHash->x], pHash->width);
-        idx += pHash->width;
+        memcpy(&pBuffer[idx], &pBooleanFrame[(y * pHash->width) + pHash->maskX], pHash->maskWidth);
+        idx += pHash->maskWidth;
       }
       pHash->booleanHash = komihash(pBuffer, length, 0);
       free(pBuffer);
     }
     else
     {
-      pHash->booleanHash = komihash(booleanFrame, 128 * 32, 0);
+      pHash->booleanHash = komihash(pBooleanFrame, pixels, 0);
     }
+    free(pBooleanFrame);
   }
 }
 
@@ -286,19 +294,18 @@ void DMD::CalculateHashIndexed(const uint8_t* pFrame, Hash* pHash)
 {
   if (pHash->mask)
   {
-    uint16_t length = pHash->width * pHash->height;
-    uint8_t* buffer = (uint8_t*)malloc(length);
+    uint8_t height = pHash->maskY + pHash->maskHeight;
+    uint16_t length = pHash->maskWidth * pHash->maskHeight;
+    uint8_t* pBuffer = (uint8_t*)malloc(length);
     uint16_t idx = 0;
 
-    for (uint8_t y = pHash->y; y < (pHash->y + pHash->height); y++)
+    for (uint8_t y = pHash->maskY; y < height; y++)
     {
-      for (uint8_t x = pHash->x; x < (pHash->x + pHash->width); x++)
-      {
-        buffer[idx++] = pFrame[(y * 128) + x];
-      }
+      memcpy(&pBuffer[idx], &pFrame[(y * pHash->width) + pHash->maskX], pHash->maskWidth);
+      idx += pHash->maskWidth;
     }
-    pHash->indexedHash = komihash(buffer, length, 0);
-    free(buffer);
+    pHash->indexedHash = komihash(pBuffer, length, 0);
+    free(pBuffer);
   }
   else
   {
@@ -306,20 +313,24 @@ void DMD::CalculateHashIndexed(const uint8_t* pFrame, Hash* pHash)
   }
 }
 
-uint16_t DMD::Match(const uint8_t* pFrame, bool exactColor)
+uint16_t DMD::Match(const uint8_t* pFrame, uint8_t width, uint8_t height, bool exactColor)
 {
   uint64_t fullHash = 0;
+  Hash hash;
+  hash.width = width;
+  hash.height = height;
 
   for (const auto& pair : m_HashMap)
   {
-    Hash hash;
+    if (pair.second.width != width || pair.second.height != height) continue;
+
     hash.mask = pair.second.mask;
     if (hash.mask)
     {
-      hash.x = pair.second.x;
-      hash.y = pair.second.y;
-      hash.width = pair.second.width;
-      hash.height = pair.second.height;
+      hash.maskX = pair.second.maskX;
+      hash.maskY = pair.second.maskY;
+      hash.maskWidth = pair.second.maskWidth;
+      hash.maskHeight = pair.second.maskHeight;
       CalculateHash(pFrame, &hash, exactColor);
     }
     else
@@ -352,20 +363,24 @@ uint16_t DMD::Match(const uint8_t* pFrame, bool exactColor)
   return 0;
 }
 
-uint16_t DMD::MatchIndexed(const uint8_t* pFrame)
+uint16_t DMD::MatchIndexed(const uint8_t* pFrame, uint8_t width, uint8_t height)
 {
   uint64_t fullHash = 0;
+  Hash hash;
+  hash.width = width;
+  hash.height = height;
 
   for (const auto& pair : m_HashMap)
   {
-    Hash hash;
+    if (pair.second.width != width || pair.second.height != height) continue;
+
     hash.mask = pair.second.mask;
     if (hash.mask)
     {
-      hash.x = pair.second.x;
-      hash.y = pair.second.y;
-      hash.width = pair.second.width;
-      hash.height = pair.second.height;
+      hash.maskX = pair.second.maskX;
+      hash.maskY = pair.second.maskY;
+      hash.maskWidth = pair.second.maskWidth;
+      hash.maskHeight = pair.second.maskHeight;
       CalculateHashIndexed(pFrame, &hash);
     }
     else
