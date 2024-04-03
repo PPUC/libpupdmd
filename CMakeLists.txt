@@ -118,7 +118,7 @@ if(BUILD_STATIC)
    install(TARGETS pupdmd_static
       LIBRARY DESTINATION ${CMAKE_INSTALL_PREFIX}/lib
    )
-   install(FILES src/pupdmd-decode.h DESTINATION ${CMAKE_INSTALL_PREFIX}/include)
+   install(FILES src/pupdmd.h DESTINATION ${CMAKE_INSTALL_PREFIX}/include)
 
    if(PLATFORM STREQUAL "win" OR PLATFORM STREQUAL "macos" OR PLATFORM STREQUAL "linux")
       add_executable(pupdmd_test_s
