@@ -59,6 +59,9 @@ jobs:
             platform: ios
             arch: arm64
           - os: macos-latest
+            platform: ios-simulator
+            arch: arm64
+          - os: macos-latest
             platform: tvos
             arch: arm64
     steps:
@@ -67,9 +70,9 @@ jobs:
         name: Add msbuild to path (win runner)
         uses: microsoft/setup-msbuild@v2
       - if: (matrix.os == 'macos-latest')
-        name: Add autoconf and automake (mac runner)
+        name: Add autoconf, automake, and libtool (mac runner)
         run: |
-           brew install autoconf automake 
+           brew install autoconf automake libtool
       - if: (!(matrix.platform == 'linux' && matrix.arch == 'aarch64'))
         name: Build libpupdmd-${{ matrix.platform }}-${{ matrix.arch }}
         run: |
@@ -137,7 +140,7 @@ jobs:
                cp -a build/*.{so,so.*} tmp
                cp build/pupdmd_test_s tmp
                cp build/pupdmd_test tmp
-            elif [[ "${{ matrix.platform }}" == "ios" || "${{ matrix.platform }}" == "tvos" ]]; then
+            elif [[ "${{ matrix.platform }}" == "ios" || "${{ matrix.platform }}" == "ios-simulator" || "${{ matrix.platform }}" == "tvos" ]]; then
                cp build/libpupdmd.a tmp
                cp -a build/*.dylib tmp
             elif [[ "${{ matrix.platform }}" == "android" ]]; then
@@ -213,5 +216,6 @@ jobs:
             libpupdmd-${{ needs.version.outputs.tag }}-linux-x64/libpupdmd-${{ needs.version.outputs.tag }}-linux-x64.tar.gz
             libpupdmd-${{ needs.version.outputs.tag }}-linux-aarch64/libpupdmd-${{ needs.version.outputs.tag }}-linux-aarch64.tar.gz
             libpupdmd-${{ needs.version.outputs.tag }}-ios-arm64/libpupdmd-${{ needs.version.outputs.tag }}-ios-arm64.tar.gz
+            libpupdmd-${{ needs.version.outputs.tag }}-ios-simulator-arm64/libpupdmd-${{ needs.version.outputs.tag }}-ios-simulator-arm64.tar.gz
             libpupdmd-${{ needs.version.outputs.tag }}-tvos-arm64/libpupdmd-${{ needs.version.outputs.tag }}-tvos-arm64.tar.gz
             libpupdmd-${{ needs.version.outputs.tag }}-android-arm64-v8a/libpupdmd-${{ needs.version.outputs.tag }}-android-arm64-v8a.tar.gz
