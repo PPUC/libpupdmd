@@ -2,6 +2,8 @@
 
 #include <cstring>
 #include <filesystem>
+#include <optional>
+#include <algorithm>
 #include <fstream>
 #include <iostream>
 #include <regex>
@@ -13,6 +15,33 @@ namespace fs = std::filesystem;
 
 namespace PUPDMD
 {
+
+std::string to_lower(const std::string& str)
+{
+  std::string lower_str;
+  std::transform(str.begin(), str.end(), std::back_inserter(lower_str), [](unsigned char c) { return std::tolower(c); });
+  return lower_str;
+}
+
+std::optional<std::string> find_case_insensitive_folder(const std::string& dir_path, const std::string& foldername)
+{
+  if (!fs::exists(dir_path) || !fs::is_directory(dir_path))
+     return std::nullopt;
+
+  std::string lower_foldername = to_lower(foldername);
+  for (const auto& entry : fs::directory_iterator(dir_path)) {
+    if (entry.is_directory()) {
+      std::string entry_foldername = entry.path().filename().string();
+      if (to_lower(entry_foldername) == lower_foldername) {
+        std::string found_folder = entry.path().string();
+        if (found_folder.back() != '/')
+          found_folder += '/';
+        return found_folder;
+      }
+    }
+  }
+  return std::nullopt;
+}
 
 DMD::DMD() {}
 
@@ -39,24 +68,24 @@ void DMD::Log(const char* format, ...)
 
 bool DMD::Load(const char* const puppath, const char* const romname, uint8_t bitDepth)
 {
-  char folderPath[PUPDMD_MAX_PATH_SIZE + PUPDMD_MAX_NAME_SIZE + 12];
   std::string puppathObj(puppath);
-  puppathObj.erase(puppathObj.find_last_not_of("/\\") + 1);
-  snprintf(folderPath, PUPDMD_MAX_PATH_SIZE + PUPDMD_MAX_NAME_SIZE + 11, "%s/%s/PupCapture", puppathObj.c_str(),
-           romname);
+  if (puppathObj.back() != '\\' && puppathObj.back() != '/')
+    puppathObj += '/';
+  puppathObj += std::string(romname);
+  puppathObj += '/';
 
-  if (!fs::is_directory(folderPath))
-  {
-    Log("Directory does not exist: %s", folderPath);
+  std::optional<std::string> pFolderPath = find_case_insensitive_folder(puppathObj, "PupCapture");
+  if (!pFolderPath) {
+    Log("Directory does not exist: %sPupCapture", puppathObj.c_str());
     return false;
   }
 
-  Log("Scanning directory: %s", folderPath);
+  Log("Scanning directory: %s", pFolderPath->c_str());
 
   // Regular expression to extract numeric part from file name (case insensitive)
   std::regex pattern(R"((\d+)\.bmp)", std::regex_constants::icase);
 
-  for (const auto& entry : fs::directory_iterator(folderPath))
+  for (const auto& entry : fs::directory_iterator(*pFolderPath))
   {
     std::string filePath = entry.path().string();
     uint16_t triggerID = 0;
