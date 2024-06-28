@@ -2,7 +2,7 @@
 
 #define PUPDMD_VERSION_MAJOR 0  // X Digits
 #define PUPDMD_VERSION_MINOR 4  // Max 2 Digits
-#define PUPDMD_VERSION_PATCH 0  // Max 2 Digits
+#define PUPDMD_VERSION_PATCH 1  // Max 2 Digits
 
 #define _PUPDMD_STR(x) #x
 #define PUPDMD_STR(x) _PUPDMD_STR(x)
