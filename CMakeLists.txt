@@ -80,23 +80,32 @@ if(BUILD_SHARED)
 
    target_include_directories(pupdmd_shared PUBLIC ${PUPDMD_INCLUDE_DIRS})
 
-   if(PLATFORM STREQUAL "win" AND ARCH STREQUAL "x64")
+   if((PLATFORM STREQUAL "win" OR PLATFORM STREQUAL "win-mingw") AND ARCH STREQUAL "x64")
       set(PUPDMD_OUTPUT_NAME "pupdmd64")
    else()
       set(PUPDMD_OUTPUT_NAME "pupdmd")
    endif()
 
-   set_target_properties(pupdmd_shared PROPERTIES
-      OUTPUT_NAME ${PUPDMD_OUTPUT_NAME}
-      VERSION ${VERSION_MAJOR}.${VERSION_MINOR}.${VERSION_PATCH}
-   )
+   if(PLATFORM STREQUAL "win-mingw")
+      set_target_properties(pupdmd_shared PROPERTIES
+         PREFIX ""
+         IMPORT_PREFIX ""
+         OUTPUT_NAME ${PUPDMD_OUTPUT_NAME}
+         VERSION ${VERSION_MAJOR}.${VERSION_MINOR}.${VERSION_PATCH}
+      )
+   else()
+      set_target_properties(pupdmd_shared PROPERTIES
+         OUTPUT_NAME ${PUPDMD_OUTPUT_NAME}
+         VERSION ${VERSION_MAJOR}.${VERSION_MINOR}.${VERSION_PATCH}
+      )
+   endif()
 
    install(TARGETS pupdmd_shared
       LIBRARY DESTINATION ${CMAKE_INSTALL_PREFIX}/lib
    )
    install(FILES src/pupdmd.h DESTINATION ${CMAKE_INSTALL_PREFIX}/include)
 
-   if(PLATFORM STREQUAL "win" OR PLATFORM STREQUAL "macos" OR PLATFORM STREQUAL "linux")
+   if(PLATFORM STREQUAL "win" OR PLATFORM STREQUAL "win-mingw" OR PLATFORM STREQUAL "macos" OR PLATFORM STREQUAL "linux")
       add_executable(pupdmd_test
          src/test.cpp
       )
@@ -110,8 +119,9 @@ if(BUILD_STATIC)
 
    target_include_directories(pupdmd_static PUBLIC ${PUPDMD_INCLUDE_DIRS})
 
-   if(PLATFORM STREQUAL "win")
+   if(PLATFORM STREQUAL "win" OR PLATFORM STREQUAL "win-mingw")
       set_target_properties(pupdmd_static PROPERTIES
+         PREFIX ""
          OUTPUT_NAME "pupdmd_static"
       )
    else()
@@ -125,7 +135,7 @@ if(BUILD_STATIC)
    )
    install(FILES src/pupdmd.h DESTINATION ${CMAKE_INSTALL_PREFIX}/include)
 
-   if(PLATFORM STREQUAL "win" OR PLATFORM STREQUAL "macos" OR PLATFORM STREQUAL "linux")
+   if(PLATFORM STREQUAL "win" OR PLATFORM STREQUAL "win-mingw" OR PLATFORM STREQUAL "macos" OR PLATFORM STREQUAL "linux")
       add_executable(pupdmd_test_s
          src/test.cpp
       )
