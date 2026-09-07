@@ -71,8 +71,19 @@ bool DMD::Load(const char* const puppath, const char* const romname, uint8_t bit
   std::string puppathObj(puppath);
   if (puppathObj.back() != '\\' && puppathObj.back() != '/')
     puppathObj += '/';
-  puppathObj += std::string(romname);
-  puppathObj += '/';
+
+  // Match the ROM folder case-insensitively, like the PupCapture folder below. Packs are
+  // authored on Windows and often ship the folder with a different case than the ROM name
+  // ("Barbwire" for "barbwire"); on a case-sensitive filesystem the exact join fails and no
+  // capture trigger is ever loaded. The exact join stays as the fallback.
+  std::optional<std::string> pRomFolder = find_case_insensitive_folder(puppathObj, romname);
+  if (pRomFolder)
+    puppathObj = *pRomFolder;
+  else
+  {
+    puppathObj += std::string(romname);
+    puppathObj += '/';
+  }
 
   std::optional<std::string> pFolderPath = find_case_insensitive_folder(puppathObj, "PupCapture");
   if (!pFolderPath) {
