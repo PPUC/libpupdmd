@@ -68,6 +68,8 @@ void DMD::Log(const char* format, ...)
 
 bool DMD::Load(const char* const puppath, const char* const romname, uint8_t bitDepth)
 {
+  m_bitDepth = bitDepth;
+
   std::string puppathObj(puppath);
   if (puppathObj.back() != '\\' && puppathObj.back() != '/')
     puppathObj += '/';
@@ -351,7 +353,7 @@ void DMD::CalculateHashIndexed(const uint8_t* pFrame, Hash* pHash)
   }
   else
   {
-    pHash->indexedHash = komihash(pFrame, 128 * 32, 0);
+    pHash->indexedHash = komihash(pFrame, (uint16_t)pHash->width * pHash->height, 0);
   }
 }
 
@@ -405,8 +407,54 @@ uint16_t DMD::Match(const uint8_t* pFrame, uint8_t width, uint8_t height, bool e
   return 0;
 }
 
-uint16_t DMD::MatchIndexed(const uint8_t* pFrame, uint8_t width, uint8_t height)
+uint16_t DMD::MatchIndexed(const uint8_t* pFrame, uint16_t width, uint16_t height)
 {
+  // Capture reference images for DMDs wider than 128 pixels are stored at 128x32: a
+  // 256x64 frame maps to a full 128x32 image, a 192x64 frame to a 96x32 image centered
+  // in it. If no reference exists at the incoming frame size, reduce the frame to
+  // 128x32 with a 2x2 box filter before matching.
+  bool downscale = height == 64 && (width == 192 || width == 256);
+  if (downscale)
+  {
+    for (const auto& pair : m_HashMap)
+    {
+      if (pair.second.width == width && pair.second.height == height)
+      {
+        downscale = false;
+        break;
+      }
+    }
+  }
+
+  uint8_t downscaled[128 * 32];
+  if (downscale)
+  {
+    memset(downscaled, 0, sizeof(downscaled));
+
+    // Comparing captured frames against the pack reference images shows the capture
+    // does not round the 0..12 box sum to the nearest level. For a 2 bit (4 level)
+    // DMD it quantizes at 3/6/11, not at the round-to-nearest 2/6/10 - this shifts
+    // the darkest and brightest steps. Rounding instead leaves glyph edges one level
+    // off, so the indexed frame hash never matches and capture triggers never fire
+    // (e.g. Baywatch). Quantize to match the capture.
+    const bool fourLevel = (m_bitDepth == 2);
+    const uint16_t ofsX = (128 - width / 2) / 2;
+    for (uint16_t y = 0; y < 32; y++)
+    {
+      for (uint16_t x = 0; x < width / 2; x++)
+      {
+        const uint32_t px = x * 2;
+        const uint32_t py = y * (2 * width);
+        const uint32_t sum = pFrame[py + px] + pFrame[py + px + 1] + pFrame[py + px + width] + pFrame[py + px + width + 1];
+        downscaled[y * 128 + ofsX + x] =
+            fourLevel ? (sum < 3 ? 0 : sum < 6 ? 1 : sum < 11 ? 2 : 3) : static_cast<uint8_t>((sum + 2) >> 2);
+      }
+    }
+    pFrame = downscaled;
+    width = 128;
+    height = 32;
+  }
+
   uint64_t fullHash = 0;
   Hash hash;
   hash.width = width;

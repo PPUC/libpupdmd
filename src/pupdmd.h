@@ -82,7 +82,7 @@ class PUPDMDAPI DMD
   void SetLogCallback(PUPDMD_LogCallback callback, const void* userData);
   bool Load(const char* const puppath, const char* const romname, uint8_t bitDepth = 2);
   uint16_t Match(const uint8_t* pFrame, uint8_t width, uint8_t height, bool exactColor = true);
-  uint16_t MatchIndexed(const uint8_t* pFrame, uint8_t width, uint8_t height);
+  uint16_t MatchIndexed(const uint8_t* pFrame, uint16_t width, uint16_t height);
   const std::map<uint16_t, Hash> GetHashMap() { return m_HashMap; }
 
  private:
@@ -92,6 +92,7 @@ class PUPDMDAPI DMD
 
   std::map<uint16_t, Hash> m_HashMap;
   uint16_t m_lastTriggerID = 0;
+  uint8_t m_bitDepth = 2;
 
   PUPDMD_LogCallback m_logCallback = nullptr;
   const void* m_logUserData = nullptr;
